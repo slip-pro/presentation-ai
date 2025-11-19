@@ -7,11 +7,9 @@ RUN npm install -g pnpm
 
 # Копируем конфиги
 COPY package.json pnpm-lock.yaml ./
-# !!! ВАЖНО: Копируем папку prisma ПЕРЕД установкой, 
-# чтобы скрипт postinstall (prisma generate) нашел схему
+# Копируем призму для генерации клиента
 COPY prisma ./prisma
 
-# Теперь установка пройдет успешно, так как schema.prisma на месте
 RUN pnpm i --frozen-lockfile
 
 # 2. Сборка (Builder)
@@ -19,33 +17,48 @@ FROM base AS builder
 WORKDIR /app
 RUN npm install -g pnpm
 
-# Забираем установленные модули
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Собираем проект
+# === ВОТ ТУТ МАГИЯ: ЗАГЛУШКИ ДЛЯ СБОРКИ ===
+# Мы даем фейковые данные, чтобы валидатор Zod пропустил нас.
+# Реальные ключи вы подставите уже когда будете запускать контейнер (в .env или k8s)
+
+# Ссылка должна выглядеть как URL, иначе валидация не пройдет
+ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
+ENV NEXTAUTH_URL="http://localhost:3000"
+
+# Остальным достаточно просто быть не пустыми строками
+ENV TAVILY_API_KEY="mock_key_for_build"
+ENV OPENAI_API_KEY="mock_key_for_build"
+ENV TOGETHER_AI_API_KEY="mock_key_for_build"
+ENV GOOGLE_CLIENT_ID="mock_key_for_build"
+ENV GOOGLE_CLIENT_SECRET="mock_key_for_build"
+ENV UNSPLASH_ACCESS_KEY="mock_key_for_build"
+ENV NEXTAUTH_SECRET="mock_key_for_build"
+
+# Также попробуем штатный способ отключения валидации (работает в T3 Stack)
+ENV SKIP_ENV_VALIDATION=1
+
+# ==========================================
+
 RUN pnpm run build
 
-# !!! ЧИСТКА: Удаляем devDependencies (типа typescript, eslint), 
-# но оставляем сгенерированный Prisma Client
+# Чистим лишнее
 RUN pnpm prune --prod
 
 # 3. Финальный образ (Runner)
 FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV production
-# Устанавливаем npm/pnpm для запуска (на всякий случай)
 RUN npm install -g pnpm
 
 COPY package.json pnpm-lock.yaml ./
 
-# !!! ХИТРОСТЬ: Мы не запускаем install здесь снова.
-# Мы просто копируем уже готовые "чистые" модули из builder.
-# Это предотвращает ошибку "prisma not found" и ускоряет запуск.
+# Копируем готовые модули и билд
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next ./.next
-# Иногда в проде нужна схема для работы движка Prisma
 COPY --from=builder /app/prisma ./prisma
 
 EXPOSE 3000
