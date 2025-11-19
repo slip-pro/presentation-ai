@@ -1,0 +1,44 @@
+name: Sync Fork
+
+on:
+  schedule:
+    # Запускать каждые 12 часов (можно поменять частоту)
+    - cron: '0 */12 * * *' 
+  # Кнопка для ручного запуска (на случай, если не хотите ждать)
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout target repo
+        uses: actions/checkout@v3
+        with:
+          # Используем ваш токен, чтобы пуш от этого экшена
+          # запустил экшен сборки докера
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
+      - name: Sync upstream changes
+        id: sync
+        uses: aormsby/Fork-Sync-With-Upstream-action@v3.4
+        with:
+          # Ссылка на оригинальный репозиторий
+          upstream_sync_repo: allweonedev/presentation-ai
+          # Ветка оригинала
+          upstream_sync_branch: main
+          # Ваша ветка
+          target_sync_branch: main
+          # Токен, который мы создали
+          target_repo_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          
+          # Этот параметр важен: он делает hard reset вашей ветки до состояния оригинала.
+          # Так как вы не правите код, это безопасно и гарантирует отсутствие конфликтов.
+          test_mode: false
+
+      - name: Check for new changes
+        if: steps.sync.outputs.has_new_commits == 'true'
+        run: echo "New commits were found to sync."
+      
+      - name: No new changes
+        if: steps.sync.outputs.has_new_commits == 'false'
+        run: echo "There were no new commits."
