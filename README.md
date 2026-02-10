@@ -332,7 +332,7 @@ https://github.com/sponsors/allweonedev
 
 Need help or have questions?
 
-- 💬 [Discord Community](https://discord.gg/wSVNudUBdY)
+- 💬 [Discord Community](https://discord.gg/kZaJjZ7HjR)
 - 🐛 [Report a Bug](https://github.com/allweonedev/presentation-ai/issues)
 - 💡 [Request a Feature](https://github.com/allweonedev/presentation-ai/issues)
 - 📧 Contact us via GitHub Issues or Discord
